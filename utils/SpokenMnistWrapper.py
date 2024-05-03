@@ -23,6 +23,17 @@ class SpokenMnistWrapperAPI:
     - get_speakers(): Returns an array of unique speaker names in the dataset.
     - get_labels(): Returns an array of unique labels in the dataset.
     - get_sample(sample_size, digits=None, speakers=None, min_length=None, max_length=None): Returns a sample of items from the dataset that match the specified criteria.
+
+    Example usage:
+
+    # load the full dataset from hub
+    data = SpokenMnistWrapperAPI(path, trimmed = True)
+
+    # load the unique speakers contained in the dataset
+    speakers = data.get_speakers()
+
+    # load a sample of the spoken MNIST dataset based on criterions
+    sample = data.get_sample(3, digits = [0,1], speakers = ['george'], min_length = 1000)
     """
 
     def __init__(self, trimmed=False):
@@ -127,7 +138,7 @@ class SpokenMnistWrapperAPI:
         """
         return np.unique(self.dataset['labels'].to_numpy())
 
-    def get_sample(self, sample_size, digits=None, speakers=None, min_length=None, max_length=None):
+    def get_sample(self, sample_size = None, digits=None, speakers=None, min_length=None, max_length=None):
         """
         Returns a sample of items from the dataset that match the specified criteria.
 
@@ -164,15 +175,22 @@ class SpokenMnistWrapperAPI:
         if max_length is not None:
             indices = [i for i in indices if len(self.get_audio_from_index(i)) < max_length]
 
-        if len(indices) < sample_size:
-            raise ValueError("Not enough items in the dataset that match the specified criteria.")
+        if sample_size is not None:
+            if len(indices) < sample_size:
+                raise ValueError("Not enough items in the dataset that match the specified criteria.")
+            sample_indices = np.array(indices)[np.random.randint(low=0, high=len(indices) - 1, size=sample_size)]
+        else:
+            sample_indices = np.array(indices)
 
-        sample_indices = np.array(indices)[np.random.randint(low=0, high=len(indices) - 1, size=sample_size)]
+        if len(sample_indices) ==0 :
+                raise ValueError("Not enough items in the dataset that match the specified criteria.")
+
         for index in sample_indices:
             sample.append(self.get_item_from_index(index))
 
         return sample
     
+
 class SpokenMnistWrapperLocal:
     """
     A wrapper class for accessing the Spoken MNIST dataset via a local file.
@@ -190,6 +208,18 @@ class SpokenMnistWrapperLocal:
     - get_labels(): Returns an array of unique labels in the dataset.
     - get_sample(sample_size, digits=None, speakers=None, min_length=None, max_length=None): Returns a sample of items from the dataset that match the specified criteria.
 
+    Example usage:
+
+    # load all the wav files having the right naming convetion in a target folder
+    path = "path/to/wav/files/audio_data/folder"
+    data = SpokenMnistWrapperLocal(path, trimmed = True)
+
+    # load the unique speakers contained in the dataset
+    speakers = data.get_speakers()
+
+    # load a sample of the spoken MNIST dataset based on criterions
+    sample = data.get_sample(3, digits = [0,1], speakers = ['george'])
+
     """
 
     def __init__(self, path, trimmed=False):
@@ -202,19 +232,6 @@ class SpokenMnistWrapperLocal:
 
         Raises:
         - ValueError: If the specified path does not exist or does not contain any wav files.
-
-        Example usage:
-
-        # load all the wav files having the right naming convetion in a target folder
-        path = "path/to/wav/files/audio_data/folder"
-        data = SpokenMnistWrapperLocal(path, trimmed = True)
-
-        # load the unique speakers contained in the dataset
-        speakers = data.get_speakers()
-
-        # load a sample of the spoken MNIST dataset based on criterions
-        sample = data.get_sample(3, digits = [0,1], speakers = ['george'], )
-
 
         """
         if os.path.exists(path):
@@ -331,7 +348,7 @@ class SpokenMnistWrapperLocal:
         """
         return np.unique(self.dataset['labels'].to_numpy())
 
-    def get_sample(self, sample_size, digits=None, speakers=None, min_length=None, max_length=None):
+    def get_sample(self, sample_size = None, digits=None, speakers=None, min_length=None, max_length=None):
         """
         Returns a sample of items from the dataset that match the specified criteria.
 
@@ -368,15 +385,20 @@ class SpokenMnistWrapperLocal:
         if max_length is not None:
             indices = [i for i in indices if len(self.get_audio_from_index(i)) < max_length]
 
-        if len(indices) < sample_size:
-            raise ValueError("Not enough items in the dataset that match the specified criteria.")
+        if sample_size is not None:
+            if len(indices) < sample_size:
+                raise ValueError("Not enough items in the dataset that match the specified criteria.")
+            sample_indices = np.array(indices)[np.random.randint(low=0, high=len(indices) - 1, size=sample_size)]
+        else:
+            sample_indices = np.array(indices)
 
-        sample_indices = np.array(indices)[np.random.randint(low=0, high=len(indices) - 1, size=sample_size)]
+        if len(sample_indices) ==0 :
+                raise ValueError("Not enough items in the dataset that match the specified criteria.")
+
         for index in sample_indices:
             sample.append(self.get_item_from_index(index))
 
         return sample
-
     
 
 
