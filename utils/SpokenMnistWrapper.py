@@ -1,9 +1,15 @@
 import hub
 import numpy as np
+from .trimmer import trim_silence
+import os
+import pandas as pd
+from scipy.io import wavfile
+import torch
+                    
 
-class SpokenMnistWrapper:
+class SpokenMnistWrapperAPI:
     """
-    A wrapper class for the Spoken MNIST dataset.
+    A wrapper class for accessin the Spoken MNIST dataset via the hub API.
 
     Attributes:
     - dataset: The Spoken MNIST dataset loaded from the ActiveLoop hub.
@@ -16,12 +22,27 @@ class SpokenMnistWrapper:
     - get_item(index): Returns a dictionary containing audio, spectrogram, label, and speaker data for a given index.
     - get_speakers(): Returns an array of unique speaker names in the dataset.
     - get_labels(): Returns an array of unique labels in the dataset.
-    - get_sample(sample_size, digits=None, speakers=None): Returns a sample of items from the dataset that match the specified criteria.
+    - get_sample(sample_size, digits=None, speakers=None, min_length=None, max_length=None): Returns a sample of items from the dataset that match the specified criteria.
     """
 
-    def __init__(self):
-        self.dataset = hub.load("hub://activeloop/spoken_mnist")
+    def __init__(self, trimmed=False):
+        ds = hub.load("hub://activeloop/spoken_mnist")
+
+        
         self.sampling_rate = 8000 # All recordings should be mono 8kHz
+
+        if trimmed:
+            rows_list = []
+            for i, sample in enumerate(ds):
+                audio =  ds['audio'][i]
+                trimmed_audio = trim_silence(audio.numpy())
+                rows_list.append({'labels': ds['labels'][i].numpy()[0], 'speakers': ds['speakers'][i].numpy()[0], 'audio': torch.tensor(trimmed_audio, dtype=torch.float64),'spectrograms': ds['spectrograms'][i]})
+            self.dataset = pd.DataFrame(rows_list, columns=['labels', 'speakers', 'audio','spectrograms'])
+        else:
+            rows_list = []
+            for i, sample in enumerate(ds):
+                rows_list.append({'labels': ds['labels'][i].numpy()[0], 'speakers': ds['speakers'][i].numpy()[0], 'audio': ds['audio'][i],'spectrograms': ds['spectrograms'][i]})
+            self.dataset = pd.DataFrame(rows_list, columns=['labels', 'speakers', 'audio','spectrograms'])
 
     def get_audio_from_index(self, index):
         """
@@ -83,9 +104,9 @@ class SpokenMnistWrapper:
         """
         return {
             'audio': self.get_audio_from_index(index),
-            'spectrogram': self.get_spectrogram_from_index(index),
-            'label': self.get_label_from_index(index),
-            'speaker': self.get_speaker_from_index(index),
+            'spectrograms': self.get_spectrogram_from_index(index),
+            'labels': self.get_label_from_index(index),
+            'speakers': self.get_speaker_from_index(index),
         }
     
     def get_speakers(self):
@@ -95,7 +116,7 @@ class SpokenMnistWrapper:
         Returns:
         - speakers (ndarray): An array of unique speaker names.
         """
-        return np.unique(self.dataset['speakers'].numpy())
+        return np.unique(self.dataset['speakers'].to_numpy())
     
     def get_labels(self):
         """
@@ -104,9 +125,9 @@ class SpokenMnistWrapper:
         Returns:
         - labels (ndarray): An array of unique labels.
         """
-        return np.unique(self.dataset['labels'].numpy())
+        return np.unique(self.dataset['labels'].to_numpy())
 
-    def get_sample(self, sample_size, digits=None, speakers=None):
+    def get_sample(self, sample_size, digits=None, speakers=None, min_length=None, max_length=None):
         """
         Returns a sample of items from the dataset that match the specified criteria.
 
@@ -114,9 +135,14 @@ class SpokenMnistWrapper:
         - sample_size (int): The number of items to include in the sample.
         - digits (list, optional): A list of digits that should be included in the sample. If not specified, any digit can be included.
         - speakers (list, optional): A list of speaker names that should be included in the sample. If not specified, any speaker can be included.
+        - min_length (int, optional): The minimum length of audio that should be included in the sample. If not specified, there is no minimum length requirement.
+        - max_length (int, optional): The maximum length of audio that should be included in the sample. If not specified, there is no maximum length requirement.
 
         Returns:
         - sample (list): A list of items from the dataset that match the specified criteria.
+
+        Raises:
+        - ValueError: If there are not enough items in the dataset that match the specified criteria.
         """
         sample = []
         indices = []
@@ -125,29 +151,37 @@ class SpokenMnistWrapper:
             indices = range(len(self.dataset))
         else:
             for i in range(len(self.dataset)):
-                label = self.get_label_from_index(i).numpy()
+                label = self.get_label_from_index(i)
                 if label in digits:
                     indices.append(i)
 
         if speakers is not None:
             indices = [i for i in indices if self.get_speaker_from_index(i) in speakers]
 
+        if min_length is not None:
+            indices = [i for i in indices if len(self.get_audio_from_index(i)) > min_length]
+
+        if max_length is not None:
+            indices = [i for i in indices if len(self.get_audio_from_index(i)) < max_length]
+
         if len(indices) < sample_size:
             raise ValueError("Not enough items in the dataset that match the specified criteria.")
 
-        sample_indices = np.array(indices)[np.random.randint(low=0,high=len(indices)-1, size= sample_size)]
+        sample_indices = np.array(indices)[np.random.randint(low=0, high=len(indices) - 1, size=sample_size)]
         for index in sample_indices:
             sample.append(self.get_item_from_index(index))
 
         return sample
     
+
+
     
 
 
 if __name__ == "__main__":
     # Example usage
     # Load the Spoken MNIST dataset
-    spoken_mnist = SpokenMnistWrapper()
+    spoken_mnist = SpokenMnistWrapperAPI()
 
     # Get the names of the speakers in the dataset
     speakers = spoken_mnist.get_speakers()
