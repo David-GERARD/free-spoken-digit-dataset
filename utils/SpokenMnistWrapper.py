@@ -1,3 +1,5 @@
+# Code by David Gerard https://github.com/David-GERARD 
+
 import hub
 import numpy as np
 from .trimmer import trim_silence
@@ -5,6 +7,7 @@ import os
 import pandas as pd
 from scipy.io import wavfile
 import torch
+import random
 
 class SpokenMnistWrapperAPI:
     """
@@ -113,6 +116,7 @@ class SpokenMnistWrapperAPI:
         - item (dict): A dictionary containing audio, spectrogram, label, and speaker data.
         """
         return {
+            'spokenMNISTindex':index,
             'audio': self.get_audio_from_index(index),
             'spectrograms': self.get_spectrogram_from_index(index),
             'labels': self.get_label_from_index(index),
